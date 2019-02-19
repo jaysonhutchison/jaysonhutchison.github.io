@@ -364,19 +364,6 @@ var ws = new WebSocket('wss://jaysonhutchison-github-io.glitch.me');
 
 ws.onopen = function (event) {
   console.log('Connection is open ...');
-
-  var data = JSON.parse(event.data);
-  map = new Map(data.map, data.mapSize);
-  console.log('loaded map');
-
-  camera.loadTextures(map);
-  loop.start(function frame(seconds) {
-    map.update(seconds);
-    player.update(controls.states, map, seconds);
-    camera.render(player, map);
-    drawFPS(seconds);
-    ws.send(JSON.stringify(player));
-  });
 };
 
 ws.onerror = function (err) {
@@ -385,6 +372,21 @@ ws.onerror = function (err) {
 
 ws.onmessage = function (event) {
   _data = event.data;
+
+  if (!map) {
+    var data = JSON.parse(event.data);
+    map = new Map(data.map, data.mapSize);
+    console.log('loaded map');
+
+    camera.loadTextures(map);
+    loop.start(function frame(seconds) {
+      map.update(seconds);
+      player.update(controls.states, map, seconds);
+      camera.render(player, map);
+      drawFPS(seconds);
+      ws.send(JSON.stringify(player));
+    });
+  }
 };
 
 ws.onclose = function() {
