@@ -174,17 +174,17 @@ Camera.prototype.loadTextures = function(map) {
   }
 };
 
-Camera.prototype.render = function(player, map, data) {
+Camera.prototype.render = function(player, map) {
   this.drawSky(player.direction, map.skybox);
-  this.drawMinimap(player, map, 192, data);
+  this.drawMinimap(player, map, 192);
   this.drawColumns(player, map);
   this.drawTarget();
 };
 
-Camera.prototype.drawMinimap = function(player, map, size, data) {
+Camera.prototype.drawMinimap = function(player, map, size) {
   var ctx = this.minimap;
   var sz = size / map.size;
-  var players = data.players;
+  var players = _data.players;
   ctx.clearRect(0, 0, size, size);
   ctx.globalAlpha = 0.7;
   ctx.fillStyle = '#000';
@@ -198,9 +198,9 @@ Camera.prototype.drawMinimap = function(player, map, size, data) {
     }
   }
   ctx.fillStyle = '#F00';
-  for (var i = 0; i < players.length; i++) {
+  for (var i in players) {
     ctx.beginPath();
-    ctx.arc(player[i].x * sz, player[i].y * sz, 3.5, 0, Math.PI*2, false);
+    ctx.arc(players[i].x * sz, players[i].y * sz, 3.5, 0, Math.PI*2, false);
     ctx.fill();
   }
   ctx.fillStyle = '#FFF';
@@ -351,7 +351,7 @@ function drawFPS() {
   ctx.fillText('FPS: ' + ~~fps, 25, 25);
 }
 
-var map;
+var map, _data;
 var display = document.getElementById('display');
 var minimap = document.getElementById('minimap');
 var player = new Player(~~(Math.random()*10+1), ~~(Math.random()*10+1), Math.PI * 0.3);
@@ -364,13 +364,7 @@ var ws = new WebSocket('wss://jaysonhutchison-github-io.glitch.me');
 
 ws.onopen = function (event) {
   console.log('Connection is open ...');
-};
 
-ws.onerror = function (err) {
-  console.log('err: ', err);
-};
-
-ws.onmessage = function (event) {
   var data = JSON.parse(event.data);
   map = new Map(data.map, data.mapSize);
   console.log('loaded map');
@@ -379,10 +373,18 @@ ws.onmessage = function (event) {
   loop.start(function frame(seconds) {
     map.update(seconds);
     player.update(controls.states, map, seconds);
-    camera.render(player, map, data);
+    camera.render(player, map);
     drawFPS(seconds);
     ws.send(JSON.stringify(player));
   });
+};
+
+ws.onerror = function (err) {
+  console.log('err: ', err);
+};
+
+ws.onmessage = function (event) {
+  _data = event.data;
 };
 
 ws.onclose = function() {
