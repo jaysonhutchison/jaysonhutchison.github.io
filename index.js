@@ -371,7 +371,7 @@ ws.onerror = function (err) {
 };
 
 ws.onmessage = function (event) {
-  _data = event.data;
+  _data = JSON.parse(event.data);
 
   if (!map) {
     var data = JSON.parse(event.data);
