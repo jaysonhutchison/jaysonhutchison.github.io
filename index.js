@@ -199,9 +199,11 @@ Camera.prototype.drawMinimap = function(player, map, size) {
   }
   ctx.fillStyle = '#F00';
   for (var i in players) {
-    ctx.beginPath();
-    ctx.arc(players[i].x * sz, players[i].y * sz, 3.5, 0, Math.PI*2, false);
-    ctx.fill();
+    if (players[i].id !== player.id) {
+      ctx.beginPath();
+      ctx.arc(players[i].x * sz, players[i].y * sz, 3.5, 0, Math.PI*2, false);
+      ctx.fill();
+    }
   }
   ctx.fillStyle = '#FFF';
   ctx.beginPath();
@@ -359,7 +361,6 @@ var controls = new Controls();
 var camera = new Camera(display, minimap, MOBILE ? 160 : 320, 0.8);
 var loop = new GameLoop();
 
-var id = Math.random().toString().replace(/\./g, '');
 var ws = new WebSocket('wss://jaysonhutchison-github-io.glitch.me');
 
 ws.onopen = function (event) {
