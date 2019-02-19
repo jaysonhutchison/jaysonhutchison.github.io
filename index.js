@@ -174,16 +174,17 @@ Camera.prototype.loadTextures = function(map) {
   }
 };
 
-Camera.prototype.render = function(player, map) {
+Camera.prototype.render = function(player, map, data) {
   this.drawSky(player.direction, map.skybox);
-  this.drawMinimap(player, map, 192);
+  this.drawMinimap(player, map, 192, data);
   this.drawColumns(player, map);
   this.drawTarget();
 };
 
-Camera.prototype.drawMinimap = function(player, map, size) {
+Camera.prototype.drawMinimap = function(player, map, size, data) {
   var ctx = this.minimap;
   var sz = size / map.size;
+  var players = data.players;
   ctx.clearRect(0, 0, size, size);
   ctx.globalAlpha = 0.7;
   ctx.fillStyle = '#000';
@@ -195,6 +196,12 @@ Camera.prototype.drawMinimap = function(player, map, size) {
         ctx.fillRect(x * sz, y * sz, sz, sz);
       }
     }
+  }
+  ctx.fillStyle = '#F00';
+  for (var i = 0; i < players.length; i++) {
+    ctx.beginPath();
+    ctx.arc(player[i].x * sz, player[i].y * sz, 3.5, 0, Math.PI*2, false);
+    ctx.fill();
   }
   ctx.fillStyle = '#FFF';
   ctx.beginPath();
@@ -347,13 +354,13 @@ function drawFPS() {
 var map;
 var display = document.getElementById('display');
 var minimap = document.getElementById('minimap');
-var player = new Player(~~(Math.random()*10), ~~(Math.random()*10), Math.PI * 0.3);
+var player = new Player(~~(Math.random()*10+1), ~~(Math.random()*10+1), Math.PI * 0.3);
 var controls = new Controls();
 var camera = new Camera(display, minimap, MOBILE ? 160 : 320, 0.8);
 var loop = new GameLoop();
 
 var id = Math.random().toString().replace(/\./g, '');
-var ws = new WebSocket('wss://csunderground-multiplayer-test.glitch.me');
+var ws = new WebSocket('wss://jaysonhutchison-github-io.glitch.me');
 
 ws.onopen = function (event) {
   console.log('Connection is open ...');
@@ -372,7 +379,7 @@ ws.onmessage = function (event) {
   loop.start(function frame(seconds) {
     map.update(seconds);
     player.update(controls.states, map, seconds);
-    camera.render(player, map);
+    camera.render(player, map, data);
     drawFPS(seconds);
     ws.send(JSON.stringify(player));
   });
