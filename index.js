@@ -47,7 +47,6 @@ function Player(x, y, direction) {
   this.x = x;
   this.y = y;
   this.direction = direction;
-  this.weapon = new Bitmap('assets/knife_hand.png', 319, 320);
   this.paces = 0;
   this.id = Math.random().toString().replace(/\./g, '');
 }
@@ -67,11 +66,13 @@ Player.prototype.walk = function(distance, angle, map) {
 Player.prototype.update = function(controls, map, seconds) {
   var size = 0, key;
   for (key in controls) {
-      if (['left','right','forward','backward'].indexOf(key) > -1 && controls[key]) size++;
+      if (['left','right','forward','backward'].indexOf(key) > -1 && controls[key]) {
+        size++;
+      }
   }
   var speed = size > 1 ? 1.5 : 3;
-  if (controls.turnleft) this.rotate(-2.8 * seconds);
-  if (controls.turnright) this.rotate(2.8 * seconds);
+  if (controls.turnleft) this.rotate(-Math.PI * seconds);
+  if (controls.turnright) this.rotate(Math.PI * seconds);
   if (controls.left) this.walk(speed * seconds, -90, map);
   if (controls.right) this.walk(-speed * seconds, -90, map);
   if (controls.forward) this.walk(speed * seconds, 0, map);
@@ -85,7 +86,6 @@ function Map(map, mapSize) {
   this.skybox = new Bitmap('assets/deathvalley_panorama.png', 2000, 750);
   this.wallTexture = new Bitmap('assets/wall_texture.jpg', 64, 64);
   this.floorTexture = new Bitmap('assets/floor_texture.jpg', 64, 64);
-  this.shadowTexture = new Bitmap('assets/shadow.png', 171, 64);
   this.light = 0;
 }
 
@@ -149,7 +149,7 @@ Map.prototype.update = function(seconds) {
 
 
 function Camera(canvas, minimap, resolution, focalLength) {
-  this.ctx = canvas.getContext('2d');
+  this.ctx = canvas.getContext('2d', { alpha: false });
   this.minimap = minimap.getContext('2d');
   this.width = canvas.width = window.innerWidth * 0.5;
   this.height = canvas.height = window.innerHeight * 0.5;
@@ -164,14 +164,20 @@ function Camera(canvas, minimap, resolution, focalLength) {
 Camera.prototype.loadTextures = function(map) {
   var ctx = this.ctx;
   var floor = map.floorTexture;
-  var $ = this;
+  var wall = map.wallTexture;
 
   floor.image.onload = function() {
     ctx.drawImage(floor.image, 0, 0);
     
     var imageData = ctx.getImageData(0, 0, floor.width, floor.height);
-    $.floorData = imageData.data;
-  }
+    map.floorData = imageData.data;
+  };
+  wall.image.onload = function() {
+    ctx.drawImage(wall.image, 0, 0);
+    
+    var imageData = ctx.getImageData(0, 0, wall.width, wall.height);
+    map.wallData = imageData.data;
+  };
 };
 
 Camera.prototype.render = function(player, map) {
@@ -249,22 +255,25 @@ Camera.prototype.drawSky = function(direction, sky) {
 };
 
 Camera.prototype.drawColumns = function(player, map) {
-  this.ctx.save();
+  // this.ctx.save();
+  var imageData = this.ctx.getImageData(0, 0, this.width, this.height);
+  this.data = imageData.data;
   for (var column = 0; column < this.resolution; column++) {
     var x = column / this.resolution - 0.5;
     var angle = Math.atan2(x, this.focalLength);
     var ray = map.cast(player, player.direction + angle, this.range);
     this.drawColumn(column, ray, angle, map);
   }
-  this.ctx.restore();
+  this.ctx.putImageData(imageData, 0, 0);
+  // this.ctx.restore();
 };
 
 Camera.prototype.drawColumn = function(column, ray, angle, map) {
   var ctx = this.ctx;
   var texture = map.wallTexture;
+  var wallData = map.wallData;
   var floor = map.floorTexture;
-  var floorData = this.floorData;
-  var shadow = map.shadowTexture;
+  var floorData = map.floorData;
   var left = Math.floor(column * this.spacing);
   var width = Math.ceil(this.spacing);
   var hit = -1;
@@ -273,36 +282,47 @@ Camera.prototype.drawColumn = function(column, ray, angle, map) {
   
   for (var s = ray.length - 1; s >= 0; s--) {
     var step = ray[s];
-
     if (s === hit) {
       var textureX = Math.floor(texture.width * step.offset);
       var wall = this.project(step.height, angle, step.distance);
 
-      ctx.globalAlpha = 1;
-      for (var y = wall.top+wall.height - width; y < this.height; y += 3) {
+      for (var y = wall.top+wall.height - width; y < this.height; y += 1) {
         var dist = this.height / (2 * y - this.height);
-        if (dist < 10 && floorData) {
-          var weight = dist / step.distance;
+        var weight = dist / step.distance;
 
-          var currentFloorX = weight * step.x + (1 - weight) * player.x;
-          var currentFloorY = weight * step.y + (1 - weight) * player.y;
+        var currentFloorX = weight * step.x + (1 - weight) * player.x;
+        var currentFloorY = weight * step.y + (1 - weight) * player.y;;
 
-          var floorTexX = ~~(currentFloorX * floor.width) % floor.width;
-          var floorTexY = ~~(currentFloorY * floor.height) % floor.height;
-          var index = (~~floorTexX + (~~floorTexY * floor.width)) << 2;
+        var floorTexX = ~~(currentFloorX * floor.width) % floor.width;
+        var floorTexY = ~~(currentFloorY * floor.height) % floor.height;
+        var index = (~~floorTexX + (~~floorTexY * floor.width)) << 2;
+        var i = (~~left + (~~y * this.width)) << 2;
 
-          ctx.fillStyle = 'rgba('+floorData[index]+','+floorData[index+1]+','+floorData[index+2]+',1)';
-          ctx.fillRect(left, y, width, 4);
-          
-          // ctx.drawImage(floor.image, floorTexX, floorTexY, 1, 1, left, y, width, 2);
-        }
+        var lightness = 1-Math.max((currentFloorY+currentFloorX)/2 / this.lightRange - map.light, 0);
+
+        this.data[i] = floorData[index] * lightness;
+        this.data[i+1] = floorData[index+1] * lightness;
+        this.data[i+2] = floorData[index+2] * lightness;
       }
-      ctx.drawImage(shadow.image, 0, 0, 1, shadow.height, left, 0, width, this.height);
-      ctx.drawImage(texture.image, textureX, 0, 1, texture.height, left, wall.top, width, wall.height);
+      for (var y = Math.max(wall.top, 0); y < Math.min(wall.top+wall.height, this.height); y++) {
+        var d = y - this.height/2 + wall.height/2;
+        var textureY = d / wall.height * texture.height;
+          
+        var index = (~~(textureX%texture.width) + (~~(textureY%texture.height) * texture.width)) << 2;
+        var i = (~~left + (~~y * this.width)) << 2;
+
+        var lightness = 1-Math.max((step.distance + step.shading) / this.lightRange - map.light, 0);
+        // lightness = 1;
+        this.data[i] = wallData[index] * lightness;
+        this.data[+1] = wallData[index+1] * lightness;
+        this.data[i+2] = wallData[index+2] * lightness;
+      }
+
+      // ctx.drawImage(texture.image, textureX, 0, 1, texture.height, left, wall.top, width, wall.height);
       
-      ctx.fillStyle = '#000';
-      ctx.globalAlpha = Math.max((step.distance + step.shading) / this.lightRange - map.light, 0);
-      ctx.fillRect(left, wall.top, width, wall.height);
+      // ctx.fillStyle = '#000';
+      // ctx.globalAlpha = Math.max((step.distance + step.shading) / this.lightRange - map.light, 0);
+      // ctx.fillRect(left, wall.top, width, wall.height);
     }
   }
 };
@@ -353,12 +373,12 @@ function drawFPS() {
   ctx.fillText('FPS: ' + ~~fps, 25, 25);
 }
 
-var map, _data;
+var map, _data; // Stuff to get from the server
 var display = document.getElementById('display');
 var minimap = document.getElementById('minimap');
 var player = new Player(~~(Math.random()*10+1), ~~(Math.random()*10+1), Math.PI * 0.3);
 var controls = new Controls();
-var camera = new Camera(display, minimap, MOBILE ? 160 : 320, 0.8);
+var camera = new Camera(display, minimap, window.innerWidth/2, 0.8);
 var loop = new GameLoop();
 
 var ws = new WebSocket('wss://jaysonhutchison-github-io.glitch.me');
@@ -377,7 +397,7 @@ ws.onmessage = function (event) {
   if (!map) {
     var data = JSON.parse(event.data);
     map = new Map(data.map, data.mapSize);
-    console.log('loaded map');
+    player.id = data.id;
 
     camera.loadTextures(map);
     loop.start(function frame(seconds) {
