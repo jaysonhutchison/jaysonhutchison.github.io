@@ -84,8 +84,8 @@ function Map(map, mapSize) {
   this.size = mapSize;
   this.wallGrid = map;
   this.skybox = new Bitmap('assets/deathvalley_panorama.png', 2000, 750);
-  this.wallTexture = new Bitmap('assets/wall_texture.jpg', 64, 64);
-  this.floorTexture = new Bitmap('assets/floor_texture.jpg', 64, 64);
+  this.wallTexture = new Bitmap('assets/wall_texture.jpg', 256, 256);
+  this.floorTexture = new Bitmap('assets/floor_texture.jpg', 256, 256);
   this.light = 0;
 }
 
@@ -298,7 +298,7 @@ Camera.prototype.drawColumn = function(column, ray, angle, map) {
         var index = (~~floorTexX + (~~floorTexY * floor.width)) << 2;
         var i = (~~left + (~~y * this.width)) << 2;
 
-        var lightness = 1-Math.max((currentFloorY+currentFloorX)/2 / this.lightRange - map.light, 0);
+        var lightness = 1-Math.max((Math.sqrt(Math.pow(currentFloorX-player.x, 2) + Math.pow(currentFloorY-player.y, 2)) + step.shading) / this.lightRange - map.light, 0);
 
         this.data[i] = floorData[index] * lightness;
         this.data[i+1] = floorData[index+1] * lightness;
@@ -312,17 +312,10 @@ Camera.prototype.drawColumn = function(column, ray, angle, map) {
         var i = (~~left + (~~y * this.width)) << 2;
 
         var lightness = 1-Math.max((step.distance + step.shading) / this.lightRange - map.light, 0);
-        // lightness = 1;
         this.data[i] = wallData[index] * lightness;
         this.data[+1] = wallData[index+1] * lightness;
         this.data[i+2] = wallData[index+2] * lightness;
       }
-
-      // ctx.drawImage(texture.image, textureX, 0, 1, texture.height, left, wall.top, width, wall.height);
-      
-      // ctx.fillStyle = '#000';
-      // ctx.globalAlpha = Math.max((step.distance + step.shading) / this.lightRange - map.light, 0);
-      // ctx.fillRect(left, wall.top, width, wall.height);
     }
   }
 };
